@@ -52,8 +52,8 @@ let app = express()
 app.use(compression())
 app.use(bodyParser.json())
 app.use(cors())
-let port = +process.env.PORT || 3000
-let host = process.env.HOST || "127.0.0.1"
+let port = +requiredEnvVar("APP_HOST")
+let host = requiredEnvVar("APP_PORT")
 let server = app.listen(port, host, () => {
 	console.log("Server listening to %s:%d within %s environment", host, port, app.get('env'))
 	declare_ready("express")
@@ -118,7 +118,7 @@ app.post(['/api', '/api/*'], (req, res) => {
 
 
 // const clientRoot = "./client/build"
-const clientRoot = requiredEnvVar("PARABIBLE_CLIENT_DIR")
+// const clientRoot = requiredEnvVar("PARABIBLE_CLIENT_DIR")
 const getUrl = (mobile) => {
 	if (mobile)
 		return '/mobile.html'
@@ -149,10 +149,10 @@ const needsFonts = (userAgent) => {
 }
 
 // Route order matters - the first listed will be invoked
-app.get("/", (req, res) => {
-	res.sendFile(getUrl(needsFonts(req.headers["user-agent"])), {root: clientRoot})
-})
-app.use(express.static(clientRoot))
-app.get("*", (req, res) => {
-	res.sendFile(getUrl(needsFonts(req.headers["user-agent"])), {root: clientRoot})
-})
+// app.get("/", (req, res) => {
+// 	res.sendFile(getUrl(needsFonts(req.headers["user-agent"])), {root: clientRoot})
+// })
+// app.use(express.static(clientRoot))
+// app.get("*", (req, res) => {
+// 	res.sendFile(getUrl(needsFonts(req.headers["user-agent"])), {root: clientRoot})
+// })
