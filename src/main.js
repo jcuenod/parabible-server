@@ -32,9 +32,13 @@ const requiredEnvVar = (variable) => {
 	return process.env[variable]
 }
 
-const mongoConnectionString = requiredEnvVar("MONGO_CONNECTION_STRING")
+
+// const mongoConnectionString = requiredEnvVar("MONGO_CONNECTION_STRING")
+const mongouser = requiredEnvVar("MONGODB_USER")
+const mongoPass = requiredEnvVar("MONGODB_PASSWORD")
 const mongoDatabase = requiredEnvVar("MONGO_DATABASE")
-const mongoUrl = `mongodb://${mongoConnectionString}/${mongoDatabase}`
+const mongoService = requiredEnvVar("DATABASE_SERVICE_NAME")
+const mongoUrl = `mongodb://${mongouser}:${mongoPass}@${mongoService}/${mongoDatabase}`
 
 let mongoConnection = null;
 MongoClient.connect(mongoUrl, (err, db) => {
