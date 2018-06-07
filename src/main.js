@@ -37,14 +37,14 @@ const requiredEnvVar = (variable) => {
 const mongouser = requiredEnvVar("MONGODB_USER")
 const mongoPass = requiredEnvVar("MONGODB_PASSWORD")
 const mongoDatabase = requiredEnvVar("MONGO_DATABASE")
-const mongoService = requiredEnvVar("DATABASE_SERVICE_NAME")
-const mongoUrl = `mongodb://${mongouser}:${mongoPass}@${mongoService}/${mongoDatabase}`
+const mongoHost = requiredEnvVar("DATABASE_SERVICE_NAME")
+const mongoUrl = `mongodb://${mongouser}:${mongoPass}@${mongoHost}/${mongoDatabase}`
 
 let mongoConnection = null;
 MongoClient.connect(mongoUrl, (err, db) => {
 	if (err) {
 		console.log("Error setting up mongo connection")
-		console.log(err)
+		console.log(">>",err.message)
 	}
 	else {
 		mongoConnection = db
@@ -56,8 +56,9 @@ let app = express()
 app.use(compression())
 app.use(bodyParser.json())
 app.use(cors())
-let port = +requiredEnvVar("APP_HOST")
-let host = requiredEnvVar("APP_PORT")
+let host = requiredEnvVar("APP_HOST")
+let port = +requiredEnvVar("APP_PORT")
+console.log(host,port)
 let server = app.listen(port, host, () => {
 	console.log("Server listening to %s:%d within %s environment", host, port, app.get('env'))
 	declare_ready("express")
