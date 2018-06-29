@@ -67,7 +67,7 @@ const _count_array_occurrences = (collocate_array) => {
     }
 }
 
-
+import {Decimal} from 'decimal.js'
 const studyCollocates = (query) => {
     let starttime = process.hrtime()
     console.log("starting query", process.hrtime(starttime))
@@ -77,8 +77,17 @@ const studyCollocates = (query) => {
     const { collocate_occurences_index, collocate_occurrences } = _count_array_occurrences(collocate_word_nodes)
     console.log(collocate_occurrences.length, process.hrtime(starttime))
     
-    const calculateExpected = (node, collocate, corpus_size) => (node * collocate) / corpus_size
-    const calculateMI = (observed, expected) => Math.log2(observed/expected)
+    const calculateExpected = (node, collocate, corpus_size) => {
+        const d_node = Decimal(node)
+        const d_collocate = Decimal(collocate)
+        const d_corpus_size = Decimal(corpus_size)
+        return d_node.times(collocate).dividedBy(corpus_size).toNumber()
+    }
+    const calculateMI = (observed, expected) => {
+        const d_observed = new Decimal(observed)
+        const d_expected = new Decimal(expected)
+        return Decimal.log2(d_observed.dividedBy(d_expected)).toNumber()
+    }
     
     const MIN_COLLOCATIONS = 5
     const filtered_collocations = collocate_occurrences.filter(c => c.count > MIN_COLLOCATIONS)
