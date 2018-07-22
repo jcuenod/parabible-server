@@ -5,4 +5,4 @@ const consoleLog = async (...debug) => {
 		console.log(...debug)
 	}
 }
-export default { consoleLog }
+export { consoleLog }
