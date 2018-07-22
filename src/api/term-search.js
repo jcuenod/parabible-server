@@ -1,7 +1,8 @@
 import book_names from '../../data/book_names'
+import { consoleLog } from '../util/do-log'
 
-var mysql      = require('mysql')
-var connection = mysql.createConnection({
+const mysql      = require('mysql')
+const connection = mysql.createConnection({
   host     : 'localhost',
   user     : 'root',
   password : 'fish',
@@ -13,14 +14,7 @@ connection.connect()
 
 const RESULT_LIMIT = 500
 
-const doLog = true
-const consoleLog = async (...debug) => {
-	if (doLog) {
-		console.log(...debug)
-	}
-}
-
-const tableName = "wide_test"
+const tableName = "word_features"
 const createRange = n => [...Array(n).keys()]
 const flatten = arrayOfArrays => [].concat(...arrayOfArrays)
 
