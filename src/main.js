@@ -5,6 +5,7 @@ import bodyParser from 'body-parser'
 import cors from 'cors'
 
 import { chapterText } from "./api/chapter-text"
+import { textFromNodeArray } from "./api/text-from-node"
 import { wordLookup } from "./api/word-lookup"
 import { termSearch, collocationSearch } from "./api/term-search"
 
@@ -90,6 +91,9 @@ app.post(['/api', '/api/*'], (req, res) => {
 			break
 		case "chapter-text":
 			responsePromise = chapterText(params, mongoConnection)
+			break
+		case "node-text":
+			responsePromise = textFromNodeArray(params)
 			break
 		default:
 			responsePromise = new Promise((resolve, reject) => {
