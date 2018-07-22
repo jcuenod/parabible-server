@@ -1,5 +1,5 @@
 import book_names from '../../data/book_names.json'
-import { _wordsThatMatchQuery } from './term-search'
+// import { _wordsThatMatchQuery } from './term-search'
 
 const allowedTexts = [
 	"wlc",
@@ -42,12 +42,12 @@ const chapterText = (params, db) => {
 	const ref = params.reference
 	const unfilteredParamTexts = params["texts"] ? new Set(params["texts"]) : new Set([])
 
-	let highlights = {}
-	if (params.hasOwnProperty("search_terms")) {
-		params.search_terms.forEach(st => {
-			highlights[st.uid] = _wordsThatMatchQuery(st.data, [ref.book], ref.chapter)
-		})
-	}
+	// let highlights = {}
+	// if (params.hasOwnProperty("search_terms")) {
+	// 	params.search_terms.forEach(st => {
+	// 		highlights[st.uid] = _wordsThatMatchQuery(st.data, [ref.book], ref.chapter)
+	// 	})
+	// }
 
 	const minv = book_names[ref.book] * 10000000 + ref.chapter * 1000
 	const maxv = book_names[ref.book] * 10000000 + (ref.chapter+1) * 1000
@@ -57,8 +57,8 @@ const chapterText = (params, db) => {
 				"reference": params.reference,
 				"text": texts
 			}
-			if (Object.keys(highlights).length > 0)
-				returnVal["highlights"] = highlights
+			// if (Object.keys(highlights).length > 0)
+			// 	returnVal["highlights"] = highlights
 			resolve(returnVal)
 		}).catch((err) => {
 			reject(err)
