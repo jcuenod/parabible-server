@@ -74,21 +74,21 @@ app.post(['/api', '/api/*'], (req, res) => {
 	let responsePromise = new Promise((resolve, reject) => resolve())
 	switch(api_request[0]) {
 		case "term-search":
-			responsePromise = termSearch(params, mongoConnection)
+			responsePromise = termSearch(params)
 			break
-		case "collocation-search":
-			responsePromise = collocationSearch(params)
-			// response = termSearch(params) 
-			break
-		case "word-study":
-			// response = termSearch(params) 
-			break
+		// case "collocation-search":
+		// 	responsePromise = collocationSearch(params)
+		// 	// response = termSearch(params) 
+		// 	break
+		// case "word-study":
+		// 	// response = termSearch(params) 
+		// 	break
 		case "word-lookup":
-			responsePromise = wordLookup(params, mongoConnection) 
+			responsePromise = wordLookup(params) 
 			break
-		case "term-highlights":
-			// response = termSearch(params) 
-			break
+		// case "term-highlights":
+		// 	// response = termSearch(params) 
+		// 	break
 		case "chapter-text":
 			responsePromise = chapterText(params, mongoConnection)
 			break
@@ -101,11 +101,12 @@ app.post(['/api', '/api/*'], (req, res) => {
 					"error": "Invalid api request. Request should be formatted /api/<type of request>",
 					"options": [
 						"term-search",
-						"collocation-search",
-						"word-study",
-						"word-lookup",
-						"term-highlights",
-						"chapter-text"
+						// "collocation-search",
+						// "word-study",
+						// "word-lookup",
+						// "term-highlights",
+						"chapter-text",
+						"node-text"
 					]
 				})
 			})
