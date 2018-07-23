@@ -1,18 +1,9 @@
+import sql from '../util/sql'
 import book_names from '../../data/book_names'
+import text_data from '../../data/text_data'
 import { consoleLog } from '../util/do-log'
 
-const mysql      = require('mysql')
-const connection = mysql.createConnection({
-  host     : 'localhost',
-  user     : 'root',
-  password : 'fish',
-  database : 'parabible_test'
-})
-connection.connect()
-// TODO: When should we end the connection?
-//		 connection.end()
-
-const RESULT_LIMIT = 500
+const RESULT_LIMIT = 2500
 
 const tableName = "word_features"
 const createRange = n => [...Array(n).keys()]
@@ -25,17 +16,15 @@ const widUniqueToLower = highCount =>
 const eachWidUnique = count => 
 	flatten(createRange(count - 1).map(n => widUniqueToLower(n + 2))).join(" AND ")
 
-
 const eachRangeNodeEqual = (count, rangeVariable) => 
 	[...Array(count - 1).keys()]
 		.map(n => `word0.${rangeVariable} = word${n + 1}.${rangeVariable}`)
 		.join(" AND ")
 
 const oneQuery = (query, n) =>
-	"(" + Object.keys(query).map(k => `word${n}._${k} = ${JSON.stringify(query[k].normalize("NFKD"))}`).join(" AND ") + ")"
+	"(" + Object.keys(query).map(k => `word${n}._${k} = ${query[k].normalize("NFKD")}`).join(" AND ") + ")"
 const eachQuery = termQueries => 
 	termQueries.map((query, i) => oneQuery(query.data, i)).join(" AND ")
-
 
 const widsWithinFilter = (filter, chapterFilter=0) => {
 	const chapterOffset = chapterFilter * 1000
@@ -52,7 +41,7 @@ const widsWithinFilter = (filter, chapterFilter=0) => {
 const validRanges = ["phrase", "clause", "sentence", "verse"]
 const validSearchRange = searchRange => validRanges.includes(searchRange) ? `_${searchRange}_node` : "_verse_node"
 
-const selectQuery = ({searchTermQueries, searchRange, searchFilter, texts}) => {
+const generateTermSearchSelectQuery = ({searchTermQueries, searchRange, searchFilter}) => {
 	const queryCount = Object.keys(searchTermQueries).length
 	const treeNode = validSearchRange(searchRange)
 
@@ -83,61 +72,148 @@ const selectQuery = ({searchTermQueries, searchRange, searchFilter, texts}) => {
 			word0.${treeNode};`
 }
 
-const termSearch = async (params, db) => {
-	let starttime = process.hrtime()
-	if (!params["texts"]) {
-		consoleLog("ERROR: you must request at least one text")
-		return "ERROR: you must request at least one text"
-	}
-	//TODO: sanitise texts
-	consoleLog("BENCHMARK: running sql query", process.hrtime(starttime))
-	const sqlQuery = selectQuery({
-		searchTermQueries: params["query"],
-		searchRange: params["search_range"] || "verse",
-		searchFilter: params["search_filter"] || [],
-		texts: params["texts"]
-	})
-	const results = await new Promise((resolve, reject) => {
-		connection.query(sqlQuery, (error, results) => {
-			resolve(results)
+// SANITISATION
+// - sanitiseSearchRange
+const possibleSearchRanges = new Set(["phrase", "clause", "sentence", "verse"])
+const sanitiseSearchRange = searchRange => {
+	if (!searchRange) return "verse"
+	const validSearchRange = possibleSearchRanges.has(searchRange)
+	if (!validSearchRange) {
+		throw({
+			"error": "Invalid `search_range` parameter. Expected string.",
+			"options": Array.from(possibleSearchRanges)
 		})
+	}
+	return searchRange
+}
+
+// - sanitiseSearchFilter
+const book_name_keys = new Set(Object.keys(book_names))
+const sanitiseSearchFilter = filter => {
+	if (!filter || filter.length === 0) return []
+	const validSearchFilter = filter.reduce(f => book_name_keys.has(f))
+	if (!validSearchFilter) {
+		throw({
+			"error": "Invalid `search_filter` parameter. Expected array of strings.",
+			"options": Array.from(book_name_keys)
+		})
+	}
+	return filter
+}
+
+const available_word_feature_set = new Set(text_data.available_word_features)
+const sanitiseQuery = query => {
+	if (!query || query.length === 0) {
+		throw({
+			"error": "The `query` parameter is required. Expected: Array of objects.",
+			"options": {
+				"[uid]": "A unique identifier for this search term.",
+				"[inverted]": "Option to find clauses without this term (currently not implemented).",
+				"data": "Object specifying word feature (key) / value pairs."
+			}
+		})
+	}
+	
+	const featureAvailableOrThrow = feature => {
+		if (!available_word_feature_set.has(feature)) {
+			throw({
+				"error": "Invalid `query.data` parameter. Expected: Object specifying word feature (key) / required value pairs.",
+				"options": text_data.available_word_features,
+				"extra": `Missing ${JSON.stringify(feature)}`
+			})
+		}
+	}
+	const newQuery = query.map(st => {
+		const toReturn = {}
+		if (st.hasOwnProperty("uid") && !/^[\d\w]+$/.test(st.uid)) {
+			throw({"error": "Expected alphanumeric string for `uid` in `query`"})
+		}
+		else {
+			toReturn["uid"] = st.uid
+		}
+		if (st.hasOwnProperty("inverted") && typeof st.inverted !== 'boolean') {
+			throw({"error": "Expected boolean for `inverted` in `query.data`"})
+		}
+		else {
+			toReturn["inverted"] = st.inverted
+		}
+		const newData = {}
+		Object.keys(st.data).forEach(feature => {
+			featureAvailableOrThrow(feature)
+			newData[feature] = sql.escape(st.data[feature])
+		})
+		toReturn["data"] = newData
+		return toReturn
 	})
+	return newQuery
+}
+
+const sanitiseParams = params => ({
+	searchTermQueries: sanitiseQuery(params["query"]),
+	searchRange: sanitiseSearchRange(params["search_range"]),
+	searchFilter: sanitiseSearchFilter(params["search_filter"])
+})
+
+const termSearch = async (params) => {
+	let starttime = process.hrtime()
+	consoleLog("BENCHMARK: starting termSearch function", process.hrtime(starttime))
+
+	const { searchTermQueries, searchRange, searchFilter } = sanitiseParams(params)
+	
+	consoleLog("BENCHMARK: running sql query", process.hrtime(starttime))
+	const sqlQuery = generateTermSearchSelectQuery({
+		searchTermQueries,
+		searchRange,
+		searchFilter
+	})
+	const { error, results } = await sql.query(sqlQuery)
+	if (error) {
+		throw({ "error": "Something went wrong with the sql query for the term search." })
+	}
 	consoleLog(sqlQuery)
 	consoleLog("BENCHMARK: returning...", process.hrtime(starttime))
-	return {
-		"count": results.length,
-		"results": results.slice(0, 5000)
+
+	const resultCount = results.length
+	const returnValue = {
+		count: resultCount
 	}
+	if (resultCount > RESULT_LIMIT) {
+		returnValue["truncated"] = `The term-search api endpoint is throttled to return a maximum of ${RESULT_LIMIT} results.`
+		returnValue["results"] = results.slice(0, RESULT_LIMIT)
+	}
+	else {
+		returnValue["results"] = results
+	}
+	return returnValue
 }
+export { termSearch }
 
-const collocationSearch = (params)=> {
-	const grouping_key = "voc_utf8"
-	return new Promise((resolve, reject) => {
-		// TODO: the syntax of _queryForWids has changed since this line...
-		// !!!!!!!!!!!!!!
-		const { word_matches } = _queryForWids({
-			queryArray: params["query"],
-			search_range: params["search_range"]
-		})
-		// params["whitelist"] == ["Verb""NFKD"]
-		const word_match_morph= word_matches.map(wid => word_data[wid][grouping_key])
-		const tally_match_data = word_match_morph.reduce((c, k) => {
-			if (!c.hasOwnProperty(k))
-				c[k] = 0
-			c[k]++
-			return c
-		}, {})
 
-		const response = {
-			"length": Object.keys(tally_match_data).length,
-			"results": tally_match_data
-		}
-		resolve(response)
-	})
-}
+// const collocationSearch = (params)=> {
+// 	const grouping_key = "voc_utf8"
+// 	return new Promise((resolve, reject) => {
+// 		// TODO: the syntax of _queryForWids has changed since this line...
+// 		// !!!!!!!!!!!!!!
+// 		const { word_matches } = _queryForWids({
+// 			queryArray: params["query"],
+// 			search_range: params["search_range"]
+// 		})
+// 		// params["whitelist"] == ["Verb""NFKD"]
+// 		const word_match_morph= word_matches.map(wid => word_data[wid][grouping_key])
+// 		const tally_match_data = word_match_morph.reduce((c, k) => {
+// 			if (!c.hasOwnProperty(k))
+// 				c[k] = 0
+// 			c[k]++
+// 			return c
+// 		}, {})
 
-export { termSearch, collocationSearch }
-
+// 		const response = {
+// 			"length": Object.keys(tally_match_data).length,
+// 			"results": tally_match_data
+// 		}
+// 		resolve(response)
+// 	})
+// }
 
 
 // SELECT
