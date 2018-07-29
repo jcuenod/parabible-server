@@ -1,68 +1,70 @@
 import book_names from '../../data/book_names.json'
+import { sanitiseTextsAndGetIds, sanitiseNodes } from '../util/sanitization'
+import sql from '../util/sql'
+
 // import { _wordsThatMatchQuery } from './term-search'
 
-const allowedTexts = [
-	"wlc",
-	"net",
-	"lxx",
-	"sbl"
-]
 
-const ridlistText = (ridlist, unfilteredParamTexts, db) => {
-	const filteredTextList = allowedTexts.filter(t => unfilteredParamTexts.has(t))
-	if (filteredTextList.length === 0)
-		filteredTextList.push("net")
-	const requestedTextsSet = new Set(filteredTextList)
-
-	return new Promise((resolve, reject) => {
-		let ridlistResponse = {}
-		//TODO: change "in" to {$gte: min, $lt: max}
-		//[or at least make it a possibilty
-		// - we need the ridlist idea for search results
-		// - but definitely not for chapters
-		const cursor = db.collection("verse_data").find({ rid: { $in: ridlist } })
-		cursor.each((err, doc) => {
-			if (err)
-				console.log("ERROR", err)
-			if (doc != null) {
-				ridlistResponse[doc["rid"]] = {}
-				requestedTextsSet.forEach(text => {
-					if (doc.hasOwnProperty(text)) {
-						ridlistResponse[doc["rid"]][text] = doc[text]
-					}
-				})
-			} else {
-				resolve(ridlistResponse)
-			}
-		})
-	})
+const _processResults = results => {
+    const resultKeys = Object.keys(results[0])
+    delete resultKeys["tree_node"]
+    delete resultKeys["rid"]
+    return results.map(r => {
+        resultKeys.forEach(k => {
+            r[k] = JSON.parse(r[k])
+        })
+        return r
+    })
 }
 
-const chapterText = (params, db) => {
+const chapterText = async (params) => {
+	console.time("benchmark")
+	console.timeLog("benchmark", "starting chapter-text")
 	const ref = params.reference
-	const unfilteredParamTexts = params["texts"] ? new Set(params["texts"]) : new Set([])
-
+	const textArray = sanitiseTextsAndGetIds(params["texts"])
+	
 	// let highlights = {}
 	// if (params.hasOwnProperty("search_terms")) {
-	// 	params.search_terms.forEach(st => {
+		// 	params.search_terms.forEach(st => {
 	// 		highlights[st.uid] = _wordsThatMatchQuery(st.data, [ref.book], ref.chapter)
 	// 	})
 	// }
-
+	
+    const selectVersePerText = textArray.map(t => `v_${t.name}.stringified_verse_text as ${t.name}_text`)
+    const fromVersePerText = textArray.map(t => `verses v_${t.name}`)
+	const whereVersePerText = textArray.map(t => `(v_${t.name}.rid = tree_node_map.rid AND v_${t.name}.text_id = ${t.id})`)
+	
 	const minv = book_names[ref.book] * 10000000 + ref.chapter * 1000
-	const maxv = book_names[ref.book] * 10000000 + (ref.chapter+1) * 1000
-	return new Promise((resolve, reject) => {
-		ridlistText(Array.from({length: maxv-minv}, (v, k) => k+minv), unfilteredParamTexts, db).then((texts) => {
-			const returnVal = {
-				"reference": params.reference,
-				"text": texts
-			}
-			// if (Object.keys(highlights).length > 0)
-			// 	returnVal["highlights"] = highlights
-			resolve(returnVal)
-		}).catch((err) => {
-			reject(err)
-		})
-	})
+	const maxv = book_names[ref.book] * 10000000 + (ref.chapter+1) * 1000 - 1
+	
+	console.timeLog("benchmark", "building query")
+	const selectionQuery = `
+        SELECT
+            tree_node_map.tree_node,
+            tree_node_map.rid,
+            ${selectVersePerText},
+            tree_node_map.stringified_wid_array
+        FROM
+            tree_node_map,
+            ${fromVersePerText}
+        WHERE
+                tree_node_map.tree_node BETWEEN ${minv} AND ${maxv}
+			AND
+				${whereVersePerText.join(" AND ")};`
+
+    console.log(selectionQuery)
+    console.timeLog("benchmark", "BENCHMARK: running chapter text query")
+    const { error, results } = await sql.query(selectionQuery)
+    console.timeLog("benchmark", "BENCHMARK: query done")
+    if (error) {
+        throw({ "error": "Something went wrong with the sql query for the node array." })
+    }
+
+    const resultCount = results.length
+
+    return {
+        count: resultCount,
+        results: _processResults(results)
+    }
 }
-export { ridlistText, chapterText }
+export { chapterText }
