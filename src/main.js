@@ -1,4 +1,3 @@
-var MongoClient = require('mongodb').MongoClient
 import express from 'express'
 import compression from 'compression'
 import bodyParser from 'body-parser'
@@ -32,22 +31,6 @@ const requiredEnvVar = (variable) => {
 	}
 	return process.env[variable]
 }
-
-const mongoConnectionString = requiredEnvVar("MONGO_CONNECTION_STRING")
-const mongoDatabase = requiredEnvVar("MONGO_DATABASE")
-const mongoUrl = `mongodb://${mongoConnectionString}/${mongoDatabase}`
-
-let mongoConnection = null;
-MongoClient.connect(mongoUrl, (err, db) => {
-	if (err) {
-		console.log("Error setting up mongo connection")
-		console.log(err)
-	}
-	else {
-		mongoConnection = db
-		declare_ready("mongo")
-	}
-})
 
 let app = express()
 app.use(compression())
@@ -90,7 +73,7 @@ app.post(['/api', '/api/*'], (req, res) => {
 		// 	// response = termSearch(params) 
 		// 	break
 		case "chapter-text":
-			responsePromise = chapterText(params, mongoConnection)
+			responsePromise = chapterText(params)
 			break
 		case "node-text":
 			responsePromise = textFromNodeArray(params)
