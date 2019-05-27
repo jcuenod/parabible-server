@@ -1,17 +1,29 @@
-import mysql from 'mysql'
-const pool = mysql.createPool({
-	connectionLimit : 10,
-	host     : 'localhost',
-	user     : 'root',
-	password : 'fish',
-	database : 'parabible_test'
+const { Pool } = require('pg')
+
+const pool = new Pool({
+	user: 'postgres',
+	host: '127.0.0.1',
+	database: 'parabible',
+	password: 'toor',
+	port: 5432,
 })
 
-export default {
+const db = {
 	query: query => new Promise((resolve, reject) => {
-		pool.query(query, (error, results, fields) => {
-			resolve({error, results, fields})
+		pool.query(query, (error, results) => {
+			if (error) {
+				reject(error)
+			}
+			else {
+				resolve(results)
+			}
 		})
 	}),
-	escape: mysql.escape
+	destroy: () => {
+		const error = pool.destroy()
+		if (error) throw error
+	}
 }
+Object.freeze(db)
+
+module.exports = db

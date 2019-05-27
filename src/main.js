@@ -3,15 +3,14 @@ import compression from 'compression'
 import bodyParser from 'body-parser'
 import cors from 'cors'
 
-import { chapterText } from "./api/chapter-text"
-import { textFromNodeArray } from "./api/text-from-node"
+// import { chapterText } from "./api/chapter-text"
+// import { textFromNodeArray } from "./api/text-from-node"
 import { wordLookup } from "./api/word-lookup"
-import { termSearch, collocationSearch } from "./api/term-search"
+import { termSearch /*, collocationSearch*/ } from "./api/term-search"
 
 import Log from "./util/logging"
 
 let things = {
-	mongo: false,
 	express: false
 }
 console.log("WAITING:", Object.keys(things))
@@ -55,7 +54,7 @@ app.post(['/api', '/api/*'], (req, res) => {
 	Log({ api_request, params, ip_address: req.ip })
 
 	let responsePromise = new Promise((resolve, reject) => resolve())
-	switch(api_request[0]) {
+	switch (api_request[0]) {
 		case "term-search":
 			responsePromise = termSearch(params)
 			break
@@ -67,17 +66,17 @@ app.post(['/api', '/api/*'], (req, res) => {
 		// 	// response = termSearch(params) 
 		// 	break
 		case "word-lookup":
-			responsePromise = wordLookup(params) 
+			responsePromise = wordLookup(params)
 			break
 		// case "term-highlights":
 		// 	// response = termSearch(params) 
 		// 	break
-		case "chapter-text":
-			responsePromise = chapterText(params)
-			break
-		case "node-text":
-			responsePromise = textFromNodeArray(params)
-			break
+		// case "chapter-text":
+		// 	responsePromise = chapterText(params)
+		// 	break
+		// case "node-text":
+		// 	responsePromise = textFromNodeArray(params)
+		// 	break
 		default:
 			responsePromise = new Promise((resolve, reject) => {
 				reject({
@@ -133,14 +132,14 @@ const needsFonts = (userAgent) => {
 	}
 	return Object.keys(regexForMobile).reduce((a, k) =>
 		a || regexForMobile[k].test(userAgent),
-	false)
+		false)
 }
 
 // Route order matters - the first listed will be invoked
 app.get("/", (req, res) => {
-	res.sendFile(getUrl(needsFonts(req.headers["user-agent"])), {root: clientRoot})
+	res.sendFile(getUrl(needsFonts(req.headers["user-agent"])), { root: clientRoot })
 })
 app.use(express.static(clientRoot))
 app.get("*", (req, res) => {
-	res.sendFile(getUrl(needsFonts(req.headers["user-agent"])), {root: clientRoot})
+	res.sendFile(getUrl(needsFonts(req.headers["user-agent"])), { root: clientRoot })
 })

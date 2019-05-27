@@ -1,4 +1,4 @@
-import sql from '../util/sql'
+import db from '../util/sql'
 import book_names from '../../data/book_names'
 import text_data from '../../data/text_data'
 import { consoleLog } from '../util/do-log'
@@ -11,22 +11,25 @@ const flatten = arrayOfArrays => [].concat(...arrayOfArrays)
 
 const eachWid = count => createRange(count).map(n => `word${n}.wid as wid${n}`).join(", ")
 const oneTablePerWord = count => createRange(count).map(n => `${tableName} AS word${n}`).join(", ")
-const widUniqueToLower = highCount => 
+const widUniqueToLower = highCount =>
 	createRange(highCount - 1).map(n => `word${n}.wid != word${highCount - 1}.wid`)
-const eachWidUnique = count => 
+const eachWidUnique = count =>
 	flatten(createRange(count - 1).map(n => widUniqueToLower(n + 2))).join(" AND ")
 
-const eachRangeNodeEqual = (count, rangeVariable) => 
+const eachRangeNodeEqual = (count, rangeVariable) =>
 	[...Array(count - 1).keys()]
 		.map(n => `word0.${rangeVariable} = word${n + 1}.${rangeVariable}`)
 		.join(" AND ")
 
 const oneQuery = (query, n) =>
-	"(" + Object.keys(query).map(k => `word${n}._${k} = ${query[k].normalize("NFKD")}`).join(" AND ") + ")"
-const eachQuery = termQueries => 
+	"(" + Object.keys(query).map(k => {
+		console.log(n, k, query[k])
+		return `word${n}._${k} = ${query[k].normalize("NFKD")}`
+	}).join(" AND ") + ")"
+const eachQuery = termQueries =>
 	termQueries.map((query, i) => oneQuery(query.data, i)).join(" AND ")
 
-const widsWithinFilter = (filter, chapterFilter=0) => {
+const widsWithinFilter = (filter, chapterFilter = 0) => {
 	const chapterOffset = chapterFilter * 1000
 	const extent = chapterFilter === 0 ? 9999999 : 999
 	return "(" +
@@ -35,13 +38,13 @@ const widsWithinFilter = (filter, chapterFilter=0) => {
 			const value2 = book_names[f] * 10000000 + chapterOffset + extent
 			return `(word0._verse_node BETWEEN ${value1} AND ${value2})`
 		}).join(" OR ")
-	+ ")"
+		+ ")"
 }
 
 const validRanges = ["phrase", "clause", "sentence", "verse"]
 const validSearchRange = searchRange => validRanges.includes(searchRange) ? `_${searchRange}_node` : "_verse_node"
 
-const generateTermSearchSelectQuery = ({searchTermQueries, searchRange, searchFilter}) => {
+const generateTermSearchSelectQuery = ({ searchTermQueries, searchRange, searchFilter }) => {
 	const queryCount = Object.keys(searchTermQueries).length
 	const treeNode = validSearchRange(searchRange)
 
@@ -79,7 +82,7 @@ const sanitiseSearchRange = searchRange => {
 	if (!searchRange) return "verse"
 	const validSearchRange = possibleSearchRanges.has(searchRange)
 	if (!validSearchRange) {
-		throw({
+		throw ({
 			"error": "Invalid `search_range` parameter. Expected string.",
 			"options": Array.from(possibleSearchRanges)
 		})
@@ -93,7 +96,7 @@ const sanitiseSearchFilter = filter => {
 	if (!filter || filter.length === 0) return []
 	const validSearchFilter = filter.reduce(f => book_name_keys.has(f))
 	if (!validSearchFilter) {
-		throw({
+		throw ({
 			"error": "Invalid `search_filter` parameter. Expected array of strings.",
 			"options": Array.from(book_name_keys)
 		})
@@ -104,7 +107,7 @@ const sanitiseSearchFilter = filter => {
 const available_word_feature_set = new Set(text_data.available_word_features)
 const sanitiseQuery = query => {
 	if (!query || query.length === 0) {
-		throw({
+		throw ({
 			"error": "The `query` parameter is required. Expected: Array of objects.",
 			"options": {
 				"[uid]": "A unique identifier for this search term.",
@@ -113,10 +116,10 @@ const sanitiseQuery = query => {
 			}
 		})
 	}
-	
+
 	const featureAvailableOrThrow = feature => {
 		if (!available_word_feature_set.has(feature)) {
-			throw({
+			throw ({
 				"error": "Invalid `query.data` parameter. Expected: Object specifying word feature (key) / required value pairs.",
 				"options": text_data.available_word_features,
 				"extra": `Missing ${JSON.stringify(feature)}`
@@ -126,13 +129,15 @@ const sanitiseQuery = query => {
 	const newQuery = query.map(st => {
 		const toReturn = {}
 		if (st.hasOwnProperty("uid") && !/^[\d\w]+$/.test(st.uid)) {
-			throw({"error": "Expected alphanumeric string for `uid` in `query`"})
+			// uid can only be letters and numbers
+			throw ({ "error": "Expected alphanumeric string for `uid` in `query`" })
 		}
 		else {
 			toReturn["uid"] = st.uid
 		}
 		if (st.hasOwnProperty("inverted") && typeof st.inverted !== 'boolean') {
-			throw({"error": "Expected boolean for `inverted` in `query.data`"})
+			// inverted must be a boolean
+			throw ({ "error": "Expected boolean for `inverted` in `query.data`" })
 		}
 		else {
 			toReturn["inverted"] = st.inverted
@@ -140,7 +145,8 @@ const sanitiseQuery = query => {
 		const newData = {}
 		Object.keys(st.data).forEach(feature => {
 			featureAvailableOrThrow(feature)
-			newData[feature] = sql.escape(st.data[feature])
+			// newData[feature] = sql.escape(st.data[feature])
+			newData[feature] = st.data[feature]
 		})
 		toReturn["data"] = newData
 		return toReturn
@@ -159,27 +165,27 @@ const termSearch = async (params) => {
 	consoleLog("BENCHMARK: starting termSearch function", process.hrtime(starttime))
 
 	const { searchTermQueries, searchRange, searchFilter } = sanitiseParams(params)
-	
+
 	consoleLog("BENCHMARK: running sql query", process.hrtime(starttime))
 	const sqlQuery = generateTermSearchSelectQuery({
 		searchTermQueries,
 		searchRange,
 		searchFilter
 	})
-	const { error, results } = await sql.query(sqlQuery)
+	console.log(sqlQuery)
+	const { error, results } = await db.query(sqlQuery)
 	if (error) {
-		throw({ "error": "Something went wrong with the sql query for the term search." })
+		throw ({ "error": "Something went wrong with the sql query for the term search." })
 	}
 	consoleLog(sqlQuery)
 	consoleLog("BENCHMARK: returning...", process.hrtime(starttime))
 
-	const resultCount = results.length
 	const returnValue = {
-		count: resultCount
+		count: results.rowCount
 	}
-	if (resultCount > RESULT_LIMIT) {
+	if (results.rowCount > RESULT_LIMIT) {
 		returnValue["truncated"] = `The term-search api endpoint is throttled to return a maximum of ${RESULT_LIMIT} results.`
-		returnValue["results"] = results.slice(0, RESULT_LIMIT)
+		returnValue["results"] = results.rows.slice(0, RESULT_LIMIT)
 	}
 	else {
 		returnValue["results"] = results
