@@ -1,4 +1,4 @@
-import db from '../util/sql'
+import db from '../util/database'
 import book_names from '../../data/book_names'
 import text_data from '../../data/text_data'
 import { consoleLog } from '../util/do-log'

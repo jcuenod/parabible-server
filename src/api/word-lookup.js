@@ -1,4 +1,4 @@
-import db from '../util/sql'
+import db from '../util/database'
 import { exception } from 'winston';
 
 const query = {

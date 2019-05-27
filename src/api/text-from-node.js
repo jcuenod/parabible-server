@@ -1,4 +1,4 @@
-import sql from '../util/sql'
+import db from '../util/database'
 import { sanitiseTextsAndGetIds, sanitiseNodes } from '../util/sanitization'
 import { consoleLog } from '../util/do-log'
 
@@ -23,8 +23,8 @@ const textFromNodeArray = async (params) => {
     const { nodes, texts } = params
     const sanitisedNodes = sanitiseNodes(nodes)
     const { nodeArray, isTruncated } = sanitisedNodes.length > RESULT_LIMIT ?
-                                        { nodeArray: sanitisedNodes.slice(0, RESULT_LIMIT), isTruncated: true } :
-                                        { nodeArray: sanitisedNodes, isTruncated: false }
+        { nodeArray: sanitisedNodes.slice(0, RESULT_LIMIT), isTruncated: true } :
+        { nodeArray: sanitisedNodes, isTruncated: false }
 
     const textArray = sanitiseTextsAndGetIds(texts)
 
@@ -49,10 +49,10 @@ const textFromNodeArray = async (params) => {
 
     consoleLog(selectionQuery)
     console.timeLog("benchmark", "BENCHMARK: running query")
-    const { error, results } = await sql.query(selectionQuery)
+    const { error, results } = await db.query(selectionQuery)
     console.timeLog("benchmark", "BENCHMARK: query done")
     if (error) {
-        throw({ "error": "Something went wrong with the sql query for the node array." })
+        throw ({ "error": "Something went wrong with the sql query for the node array." })
     }
 
     const resultCount = results.length
