@@ -26,4 +26,17 @@ const db = {
 }
 Object.freeze(db)
 
-module.exports = db
+const santizeString = val => {
+	if (null == val) return 'NULL';
+	if (Array.isArray(val)) {
+		var vals = val.map(exports.literal)
+		return "(" + vals.join(", ") + ")"
+	}
+	var backslash = ~val.indexOf('\\');
+	var prefix = backslash ? 'E' : '';
+	val = val.replace(/'/g, "''");
+	val = val.replace(/\\/g, '\\\\');
+	return prefix + "'" + val + "'";
+};
+
+module.exports = { db, santizeString }
