@@ -10,18 +10,6 @@ import { termSearch /*, collocationSearch*/ } from "./api/term-search"
 
 import Log from "./util/logging"
 
-let things = {
-	express: false
-}
-console.log("WAITING:", Object.keys(things))
-const declare_ready = (thing) => {
-	console.log("READY:", thing)
-	things[thing] = true
-	if (Object.keys(things).reduce((c, k) => c && things[k], true)) {
-		console.log("READY READY READY!")
-	}
-}
-
 
 const requiredEnvVar = (variable) => {
 	if (!process.env.hasOwnProperty(variable)) {
@@ -39,7 +27,6 @@ let port = +process.env.PORT || 3000
 let host = process.env.HOST || "127.0.0.1"
 let server = app.listen(port, host, () => {
 	console.log("Server listening to %s:%d within %s environment", host, port, app.get('env'))
-	declare_ready("express")
 })
 
 // Use X-Forwarded-For
@@ -106,40 +93,11 @@ app.post(['/api', '/api/*'], (req, res) => {
 
 // const clientRoot = "./client/build"
 const clientRoot = requiredEnvVar("PARABIBLE_CLIENT_DIR")
-const getUrl = (mobile) => {
-	if (mobile)
-		return '/mobile.html'
-	else
-		return '/index.html'
-}
-const needsFonts = (userAgent) => {
-	// technically this is not mobile - it's whether or not to dump fonts into the index.html
-	const regexForMobile = {
-		// Windows: /windows nt/i,
-		WindowsPhone: /windows phone/i,
-		// Mac: /macintosh/i,
-		// Linux: /linux/i,
-		Wii: /wii/i,
-		Playstation: /playstation/i,
-		iPad: /ipad/i,
-		iPod: /ipod/i,
-		iPhone: /iphone/i,
-		Android: /android/i,
-		Blackberry: /blackberry/i,
-		Samsung: /samsung/i,
-		// Curl: /curl/i
-		Mobile: /mobile/i
-	}
-	return Object.keys(regexForMobile).reduce((a, k) =>
-		a || regexForMobile[k].test(userAgent),
-		false)
-}
-
 // Route order matters - the first listed will be invoked
 app.get("/", (req, res) => {
-	res.sendFile(getUrl(needsFonts(req.headers["user-agent"])), { root: clientRoot })
+	res.sendFile("/index.html", { root: clientRoot })
 })
 app.use(express.static(clientRoot))
 app.get("*", (req, res) => {
-	res.sendFile(getUrl(needsFonts(req.headers["user-agent"])), { root: clientRoot })
+	res.sendFile("/index.html", { root: clientRoot })
 })
